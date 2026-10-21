@@ -28,7 +28,7 @@ jobs:
         run: |
           npm init -y
           npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
-          echo '{"appId":"com.billbook.app","appName":"Bill Book","webDir":"www"}' > capacitor.config.json
+          echo '{"appId":"com.albinr.billbookapp","appName":"Bill Book","webDir":"www"}' > capacitor.config.json
           npx cap add android
 
       - name: App icon
