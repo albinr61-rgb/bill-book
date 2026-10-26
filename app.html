@@ -303,7 +303,7 @@ let DB;DB=loadDB();
 function loadDB(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);if(d&&d.products){return ensure(d)}}}catch(e){}return seed()}
 var CLOUD_READY=false;
 function save(q){try{if(!q)DB.modAt=Date.now();localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}if(!q&&CLOUD_READY)schedPush()}
-function blank0(){return{shop:{name:'',type:'',phone:'',gstin:'',addr:''},products:[],parties:[],sales:[],purchases:[],cash:[],pays:[],seq:{sale:0,pur:0,ret:0},drafts:[],returns:[],ui:{period:'weekly',theme:'system'},sample:false}}
+function blank0(){return{shop:{name:'',type:'',phone:'',gstin:'',addr:''},products:[],parties:[],sales:[],purchases:[],cash:[],pays:[],seq:{sale:0,pur:0,ret:0},drafts:[],returns:[],ui:{period:'weekly',theme:'light',themeV2:1},sample:false}}
 function totals(items,dp,da,extra){let sub=0,gst=0;items.forEach(i=>{const n=i.qty*i.rate-lineDisc(i);sub+=n;gst+=n*(i.gst||0)/100});sub=r2(sub);gst=r2(gst);const base=sub+gst;
   let discount=dp?base*num(dp)/100:num(da);discount=r2(Math.min(Math.max(0,discount),base));extra=r2(extra||0);return{sub,gst,discount,extra,total:r2(base-discount+extra)}}
 function makeDoc(kind,o){
@@ -364,13 +364,18 @@ async function rcptCanvas(kind,s){const W=DB.print.paper==='58mm'?384:576,FS=22,
   sep();txt('Date: '+fdate(s.date),0);y+=LH;txt((kind==='purchase'?'Supplier':'Customer')+' Details:',0);y+=LH;txt('Name : '+s.partyName,0);y+=LH;sep();
   txt('Item',0);txt('Qty',colQ,'right');txt('Rate',colR,'right');txt('Amount',W,'right');y+=LH;sep();
   s.items.forEach(i=>{x.font=FS+'px '+MONO;const nl=wrap(i.name,itemW);txt(nl[0],0);txt((qf(i.qty)+' '+(i.unit||'')).toUpperCase(),colQ,'right');txt(fm(i.rate),colR,'right');txt(fm(i.qty*i.rate-(i.disc||0)),W,'right');y+=LH;nl.slice(1).forEach(l=>{txt(l,0);y+=LH})});
+  sep();
+  const row=(l,v,f)=>{txt(l,0,'left',f);txt(v,W,'right',f);y+=LH};
+  row('Subtotal',fm(s.sub));if(s.gst)row('GST',fm(s.gst));if(s.discount)row('Discount','-'+fm(s.discount));if(s.extra)row('Extra charges',fm(s.extra));
+  sep();row('TOTAL',fm(s.total),'bold 26px '+MONO);
+  if(kind!=='quote'){row('Paid ('+(s.mode||'Cash')+')',fm(s.paid));if(s.total-s.paid>0.004)row('Balance due',fm(s.total-s.paid))}
   sep();ops.push({t:'txt',s:DB.print.footer||'Thank You!',x:W/2,y:y+22,a:'center',f:FS+'px '+MONO});y+=LH+10;
   c.width=W;c.height=Math.ceil(y)+8;x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle='#000';x.strokeStyle='#000';x.lineWidth=2;
   ops.forEach(o=>{if(o.t==='img')x.drawImage(o.img,o.x,o.y,o.w,o.h);else if(o.t==='sep'){x.setLineDash([8,5]);x.beginPath();x.moveTo(0,o.y);x.lineTo(W,o.y);x.stroke();x.setLineDash([])}else{x.font=o.f;x.textAlign=o.a||'left';x.fillText(o.s,o.x,o.y)}});
   return c}
-function rcptBytes(c){const w=c.width,h=c.height,d=c.getContext('2d').getImageData(0,0,w,h).data,bpr=w>>3,o=[0x1b,0x40];
+function rcptBytes(c){const w=c.width,h=c.height,d=c.getContext('2d').getImageData(0,0,w,h).data,bpr=w>>3,o=[0x1b,0x40],dk=Math.min(5,Math.max(1,+(DB.print&&DB.print.dark)||3)),TH=[80,115,150,185,215][dk-1],lum=(y,x)=>{if(x<0||x>=w)return 255;const p=(y*w+x)*4;return d[p+3]>128?d[p]*.3+d[p+1]*.59+d[p+2]*.11:255},on=(y,x)=>lum(y,x)<TH||(dk>=4&&lum(y,x-1)<TH)||(dk>=5&&lum(y,x+1)<TH);
   for(let y0=0;y0<h;y0+=128){const bh=Math.min(128,h-y0);o.push(0x1d,0x76,0x30,0,bpr&255,bpr>>8,bh&255,bh>>8);
-    for(let y=y0;y<y0+bh;y++)for(let bx=0;bx<bpr;bx++){let b=0;for(let k=0;k<8;k++){const p=(y*w+bx*8+k)*4,l=d[p]*.3+d[p+1]*.59+d[p+2]*.11;if(d[p+3]>128&&l<150)b|=0x80>>k}o.push(b)}}
+    for(let y=y0;y<y0+bh;y++)for(let bx=0;bx<bpr;bx++){let b=0;for(let k=0;k<8;k++){if(on(y,bx*8+k))b|=0x80>>k}o.push(b)}}
   o.push(0x1b,0x64,5,0x1d,0x56,0x42,0);return o}
 const btPrintDoc=async(kind,s)=>{try{const c=await rcptCanvas(kind,s);return btSend(rcptBytes(c))}catch(e){toast('Could not build the receipt');return false}};
 const ptsOf=n=>r2((+n||0)*(DB.ptRate||2)/1000);
@@ -1464,13 +1469,13 @@ V.printer=()=>{const q=DB.print,on=DB.printing===true;return{t:'Printer Settings
   <b style="font:700 22px var(--f-display);padding:0 4px">My Printers</b>
   ${DB.printers.length?`<div class="card">${DB.printers.map(p=>`<div class="item"><button class="t" style="text-align:left;background:none;border:0;font:inherit;color:inherit" data-a="prdef" data-id="${p.id}"><b>${esc(p.name)}</b><small>${PTYPE[p.type][0]}${p.addr?' · '+esc(p.addr):''}</small></button>${p.def?'<span class="pill paid">Default</span>':''}${trash('prdel',p.id)}</div>`).join('')}</div>`:`<div style="text-align:center;padding:20px 0;font-size:18px">No printers added yet.</div>`}
   <div class="stack" style="gap:14px">${Object.keys(PTYPE).map(k=>`<button class="pradd" style="background:${PTYPE[k][1]}" data-a="go" data-to="printerform" data-type="${k}">Add ${PTYPE[k][0]} Printer</button>`).join('')}</div>
-  <div class="card stack"><h3>Receipt settings</h3><div class="field"><label for="pr-paper">Paper size</label><select class="in" id="pr-paper">${['58mm','80mm','A4'].map(x=>`<option${q.paper===x?' selected':''}>${x}</option>`).join('')}</select></div>${field('pr-foot','Footer message',q.footer)}
+  <div class="card stack"><h3>Receipt settings</h3><div class="field"><label for="pr-paper">Paper size</label><select class="in" id="pr-paper">${['58mm','80mm','A4'].map(x=>`<option${q.paper===x?' selected':''}>${x}</option>`).join('')}</select></div>${field('pr-foot','Footer message',q.footer)}<div class="field"><label for="pr-dark">Print darkness (thermal)</label><select class="in" id="pr-dark">${[[1,'1 - Very light'],[2,'2 - Light'],[3,'3 - Normal'],[4,'4 - Dark'],[5,'5 - Very dark']].map(([v,t])=>`<option value="${v}"${(q.dark||3)===v?' selected':''}>${t}</option>`).join('')}</select></div>
   <label class="row" style="gap:10px"><input type="checkbox" id="pr-gstin"${q.gstin?' checked':''}> Show GSTIN on bills</label><label class="row" style="gap:10px"><input type="checkbox" id="pr-phone"${q.phone?' checked':''}> Show shop phone on bills</label><button class="btn block" data-a="saveprint">Save settings</button></div>
   <div class="card stack"><h3>Bluetooth thermal printer</h3><p class="muted small" style="margin:0">1) Switch the printer ON and pair it in phone Settings → Bluetooth (PIN 0000 or 1234). 2) Tap “Find paired printers” and choose it. 3) Tap “Test print”.</p><button class="btn block" data-a="btscan">Find paired printers</button><button class="btn ghost block" data-a="bttest">Test print</button></div></div>`}};
 V.printerform=p=>{const k=PTYPE[p.type]?p.type:'bluetooth';return{t:'Add '+PTYPE[k][0]+' Printer',h:`<div class="card stack"><input type="hidden" id="pf-type" value="${k}">${field('pf-name','Printer name','')}${k==='network'?`<div class="g2">${field('pf-addr','IP address','','text','inputmode="decimal" placeholder="192.168.1.50"')}${field('pf-port','Port','9100','number')}</div>`:k==='bluetooth'?field('pf-addr','Device name or address (optional)','','text','placeholder="Pair it in Android Bluetooth first"'):field('pf-addr','Model (optional)','')}<button class="btn block" data-a="saveprinter">Save printer</button></div>`}};
 
 function ensure(d){d.preturns=d.preturns||[];d.damages=d.damages||[];d.printers=d.printers||[];d.depts=d.depts||[];d.desigs=d.desigs||[];d.holidays=d.holidays||[];d.leaves=d.leaves||[];d.drafts=d.drafts||[];d.returns=d.returns||[];d.quotes=d.quotes||[];d.staff=d.staff||[];d.attend=d.attend||{};d.spay=d.spay||[];d.loans=d.loans||[];d.assets=d.assets||[];d.invest=d.invest||[];d.prod=d.prod||[];d.slog=d.slog||[];d.xfers=d.xfers||[];d.btx=d.btx||[];d.warehouses=d.warehouses||[];d.acct=d.acct||{Cash:0,Bank:0,UPI:0};
-  d.print=Object.assign({paper:'80mm',footer:'',gstin:true,phone:true},d.print||{});d.taxes=d.taxes||[0,5,12,18,28].map(r=>({id:'tx'+r,name:'GST '+r+'%',rate:r}));d.seq=d.seq||{};['sale','pur','ret','quote'].forEach(k=>{d.seq[k]=d.seq[k]||0});return d}
+  d.print=Object.assign({paper:'80mm',footer:'',gstin:true,phone:true,dark:3},d.print||{});d.ui=d.ui||{};if(!d.ui.themeV2){d.ui.theme='light';d.ui.themeV2=1}d.taxes=d.taxes||[0,5,12,18,28].map(r=>({id:'tx'+r,name:'GST '+r+'%',rate:r}));d.seq=d.seq||{};['sale','pur','ret','quote'].forEach(k=>{d.seq[k]=d.seq[k]||0});return d}
 function blank(){return ensure(blank0())}
 function updPR(){const e=$('#pr-cost');if(e)e.textContent=money(prCost().unit)}
 const rmLog=(pid,d,q,t)=>{const i=DB.slog.findIndex(s=>s.pid===pid&&s.d===d&&s.q===q&&s.t===t);if(i>=0)DB.slog.splice(i,1)};
@@ -1657,12 +1662,12 @@ const ACT={
   prrefresh(){render();toast('Refreshed')},
   async btscan(){if(!BTN())return toast('Works in the installed app only');try{const r=await BP().list(),a=r.devices||[];mdlg('Paired printers',a.length?a.map(d=>`<button type="button" class="item" style="text-align:left" data-a="btpick" data-addr="${esc(d.address)}" data-name="${esc(d.name||d.address)}"><div class="t"><b>${esc(d.name||'Unknown')}</b><small>${esc(d.address)}</small></div></button>`).join(''):'<p>No paired devices. Pair the printer in phone Bluetooth settings first.</p>','Refresh','btscan')}catch(e){toast(String((e&&e.message)||e).replace(/^.*?:\s*/,'').slice(0,80))}},
   btpick(d){DB.printers=DB.printers.filter(p=>p.addr!==d.addr);DB.printers.forEach(p=>p.def=false);DB.printers.push({id:uid(),type:'bluetooth',name:d.name,addr:d.addr,def:true});save();const m=document.getElementById('mdlg');if(m)m.remove();toast('Printer selected: '+d.name);render()},
-  bttest(){const o=[0x1b,0x40,0x1b,0x61,1,0x1b,0x45,1];const t='Zharvi Bill\nPrinter test OK\n'+(DB.print.paper||'80mm')+'\n\n\n\n';for(const c of t)o.push(c.charCodeAt(0)===10?10:c.charCodeAt(0)&0x7f);o.push(0x1d,0x56,0x42,0);btSend(o)},
+  bttest(){const W=DB.print.paper==='58mm'?384:576,c=document.createElement('canvas');c.width=W;c.height=190;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,190);x.fillStyle='#000';x.textAlign='center';x.font="bold 30px 'DejaVu Sans Mono',monospace";x.fillText('Zharvi Bill',W/2,50);x.font="22px 'DejaVu Sans Mono',monospace";x.fillText('Printer test OK',W/2,90);x.fillText('தமிழ் சோதனை',W/2,125);x.fillText('Darkness: '+(DB.print.dark||3)+' / 5',W/2,160);btSend(rcptBytes(c))},
   btprint(d){const x=docsOf(d.kind).find(a=>a.id===d.id);if(x)btPrintDoc(d.kind,x)},
   prdef(d){DB.printers.forEach(p=>p.def=p.id===d.id);save();render()},
   prdel(d){DB.printers=DB.printers.filter(p=>p.id!==d.id);if(DB.printers.length&&!DB.printers.some(p=>p.def))DB.printers[0].def=true;save();render()},
   saveprinter(){const n=$('#pf-name').value.trim();if(!n)return toast('Enter the printer name');const k=$('#pf-type').value;let a=($('#pf-addr')||{}).value||'';a=a.trim();if(k==='network'){if(!a)return toast('Enter the IP address');a+=':'+(num(($('#pf-port')||{}).value)||9100)}DB.printers.push({id:uid(),type:k,name:n,addr:a,def:!DB.printers.length});save();toast('Printer saved');back()},
-  saveprint(){DB.print=Object.assign({},DB.print,{paper:$('#pr-paper').value,footer:$('#pr-foot').value.trim(),gstin:$('#pr-gstin').checked,phone:$('#pr-phone').checked});save();toast('Settings saved')},
+  saveprint(){DB.print=Object.assign({},DB.print,{paper:$('#pr-paper').value,dark:+$('#pr-dark').value,footer:$('#pr-foot').value.trim(),gstin:$('#pr-gstin').checked,phone:$('#pr-phone').checked});save();toast('Settings saved')},
   go(d){const p=Object.assign({},d);delete p.a;const to=p.to;delete p.to;go(to,p)},
   tab(d){tab(d.to)},back(){back()},
   set(d){UI[d.k]=d.v;render()},
