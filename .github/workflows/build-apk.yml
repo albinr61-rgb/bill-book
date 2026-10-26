@@ -58,7 +58,7 @@ jobs:
           import java.util.Set;
           import java.util.UUID;
 
-          @CapacitorPlugin(name = "BtPrinter", permissions = { @Permission(alias = "bt", strings = { Manifest.permission.BLUETOOTH_CONNECT }) })
+          @CapacitorPlugin(name = "BtPrinter", permissions = { @Permission(alias = "bt", strings = { Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN }) })
           public class BtPrinterPlugin extends Plugin {
             private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
@@ -170,7 +170,7 @@ jobs:
           EOF
           M=android/app/src/main/AndroidManifest.xml
           cp $M /tmp/Manifest.orig
-          sed -i 's#<application#<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <application#' $M
+          sed -i 's#<application#<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n    <application#' $M
 
       - name: App icon
         run: |
