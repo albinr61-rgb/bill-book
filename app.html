@@ -327,8 +327,9 @@ function waText(kind,s){let t=(DB.sms||{}).tpl?tplFill(DB.sms.tpl,s):billText(ki
 function waAuto(doc){if(!(DB.sms||{}).auto||!doc.pts)return;const pp=partyOf(doc.partyId),ph=waPhone(pp&&pp.phone);if(!ph)return toast('Add the customer phone number to auto-send');const l=document.createElement('a');l.href='https://wa.me/'+ph+'?text='+encodeURIComponent(waText('sale',doc));l.target='_blank';l.rel='noopener';document.body.appendChild(l);l.click();l.remove()}
 function refreshItems(){const v=V[cur.name](cur.p),d=document.createElement('div');d.innerHTML=v.h;const nb=d.querySelector('.ibody'),ob=$('.ibody');if(nb&&ob)ob.innerHTML=nb.innerHTML;const g=d.querySelector('.badge'),og=$('.badge');if(g&&og)og.textContent=g.textContent;updTotals()}
 /* ===== Bluetooth thermal printing (ESC/POS) ===== */
+const capP=n=>{const C=window.Capacitor;if(C&&typeof C.registerPlugin==='function')return C.registerPlugin(n);if(C&&C.Plugins&&C.Plugins[n])return C.Plugins[n];throw new Error('Plugin '+n+' not available')};
 const BTN=()=>{const C=window.Capacitor;return !!(C&&C.isNativePlatform&&C.isNativePlatform())};
-const BP=()=>window.Capacitor.registerPlugin('BtPrinter');
+const BP=()=>capP('BtPrinter');
 const asc=t=>String(t==null?'':t).replace(/₹/g,'Rs.').replace(/[–—]/g,'-').replace(/[^\x20-\x7e]/g,'?');
 function escBytes(kind,s){const W=DB.print.paper==='58mm'?32:48,o=[],E=(...a)=>o.push(...a),T=t=>{const b=asc(t);for(let i=0;i<b.length;i++)o.push(b.charCodeAt(i))},L=t=>{T(t);E(10)},
   line=(a,b)=>{a=asc(a);b=asc(b);const g=Math.max(1,W-a.length-b.length);L(a.length+b.length+1>W?a.slice(0,Math.max(1,W-b.length-1))+' '+b:a+' '.repeat(g)+b)},sep=()=>L('-'.repeat(W)),m=n=>asc(money(n));
@@ -1304,7 +1305,7 @@ function labelsPdf(items,o,site){
   const xr=out.length;out+=`xref\n0 ${off.length+1}\n0000000000 65535 f \n`+off.map(x=>String(x).padStart(10,'0')+' 00000 n \n').join('')+`trailer<</Size ${off.length+1}/Root 1 0 R>>\nstartxref\n${xr}\n%%EOF`;
   return out}
 async function sharePdf(pdf,name,ttl){ttl=ttl||'Barcodes';const C=window.Capacitor;
-  try{if(C&&C.isNativePlatform&&C.isNativePlatform()){const FS=C.registerPlugin('Filesystem'),SH=C.registerPlugin('Share'),w=await FS.writeFile({path:name,data:btoa(pdf),directory:'CACHE'});await SH.share({title:ttl,files:[w.uri]});return true}}catch(e){if(e&&/cancel/i.test(String(e.message||e)))return true}
+  try{if(C&&C.isNativePlatform&&C.isNativePlatform()){const FS=capP('Filesystem'),SH=capP('Share'),w=await FS.writeFile({path:name,data:btoa(pdf),directory:'CACHE'});await SH.share({title:ttl,files:[w.uri]});return true}}catch(e){if(e&&/cancel/i.test(String(e.message||e)))return true}
   const u8=Uint8Array.from(pdf,c=>c.charCodeAt(0));
   try{const f=new File([u8],name,{type:'application/pdf'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:ttl});return true}}catch(e){if(e&&e.name==='AbortError')return true}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));a.download=name;document.body.appendChild(a);a.click();a.remove();return true}catch(e){}
@@ -1487,7 +1488,7 @@ const ACT={
     copyText((cur.name)+' '+H+'\n'+L.join('\n'),'Copied')},
   rep(d){if(d.to==='stock')UI.sw='main';if(d.to==='repdue')UI.rdt='customer';go(d.to,d.pre==='damage'?{mode:'damage'}:{});const P=d.pre;if(P==='supdue')UI.dt='supplier';else if(P==='inc')UI.et='income';else if(P==='exp')UI.et='expense';else if(P==='ret')UI.stab='return';else if(d.to==='dues')UI.dt='all';else if(d.to==='cash')UI.et='all';render()},
   async dobackup(){const json=JSON.stringify(Object.assign({},DB,{lastBackup:Date.now()})),name=bkName(),C=window.Capacitor;let ok=false;
-    try{if(C&&C.isNativePlatform&&C.isNativePlatform()){const FS=C.registerPlugin('Filesystem'),SH=C.registerPlugin('Share'),w=await FS.writeFile({path:name,data:json,directory:'CACHE',encoding:'utf8'});await SH.share({title:'Bill Book backup',files:[w.uri]});ok=true}}catch(e){if(e&&/cancel/i.test(String(e.message||e)))return}
+    try{if(C&&C.isNativePlatform&&C.isNativePlatform()){const FS=capP('Filesystem'),SH=capP('Share'),w=await FS.writeFile({path:name,data:json,directory:'CACHE',encoding:'utf8'});await SH.share({title:'Bill Book backup',files:[w.uri]});ok=true}}catch(e){if(e&&/cancel/i.test(String(e.message||e)))return}
     if(!ok)try{const f=new File([json],name,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Bill Book backup'});ok=true}}catch(e){if(e&&e.name==='AbortError')return}
     if(!ok)try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();ok=true;toast('Backup file created. If nothing downloaded, use Copy backup text below.')}catch(e){}
     if(!ok){ACT.bktext();return}
@@ -1893,7 +1894,7 @@ window.addEventListener('popstate',()=>{
   else if(cur.name!=='home'){tab('home');history.pushState({s:1},'')}
   else{toast('Press back again to exit')}
 })}catch(e){}
-try{const C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()){const AP=C.registerPlugin('App');let last=0;
+try{const C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()){const AP=capP('App');let last=0;
 const _bb=AP.addListener('backButton',()=>{
   if(document.getElementById('lockov'))return;
   {const md=document.getElementById('mdlg');if(md){md.remove();return}}
