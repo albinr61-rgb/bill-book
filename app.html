@@ -326,6 +326,26 @@ function waPhone(ph){let d=String(ph||'').replace(/\D/g,'').replace(/^0+/,'');if
 function waText(kind,s){let t=(DB.sms||{}).tpl?tplFill(DB.sms.tpl,s):billText(kind,s);if(s.pts&&!/Points earned/.test(t))t+='\n★ Points earned: '+s.pts+'%\nTotal points: '+s.ptsTotal+'%';return t}
 function waAuto(doc){if(!(DB.sms||{}).auto||!doc.pts)return;const pp=partyOf(doc.partyId),ph=waPhone(pp&&pp.phone);if(!ph)return toast('Add the customer phone number to auto-send');const l=document.createElement('a');l.href='https://wa.me/'+ph+'?text='+encodeURIComponent(waText('sale',doc));l.target='_blank';l.rel='noopener';document.body.appendChild(l);l.click();l.remove()}
 function refreshItems(){const v=V[cur.name](cur.p),d=document.createElement('div');d.innerHTML=v.h;const nb=d.querySelector('.ibody'),ob=$('.ibody');if(nb&&ob)ob.innerHTML=nb.innerHTML;const g=d.querySelector('.badge'),og=$('.badge');if(g&&og)og.textContent=g.textContent;updTotals()}
+/* ===== Bluetooth thermal printing (ESC/POS) ===== */
+const BTN=()=>{const C=window.Capacitor;return !!(C&&C.isNativePlatform&&C.isNativePlatform())};
+const BP=()=>window.Capacitor.registerPlugin('BtPrinter');
+const asc=t=>String(t==null?'':t).replace(/₹/g,'Rs.').replace(/[–—]/g,'-').replace(/[^\x20-\x7e]/g,'?');
+function escBytes(kind,s){const W=DB.print.paper==='58mm'?32:48,o=[],E=(...a)=>o.push(...a),T=t=>{const b=asc(t);for(let i=0;i<b.length;i++)o.push(b.charCodeAt(i))},L=t=>{T(t);E(10)},
+  line=(a,b)=>{a=asc(a);b=asc(b);const g=Math.max(1,W-a.length-b.length);L(a.length+b.length+1>W?a.slice(0,Math.max(1,W-b.length-1))+' '+b:a+' '.repeat(g)+b)},sep=()=>L('-'.repeat(W)),m=n=>asc(money(n));
+  E(0x1b,0x40);E(0x1b,0x61,1);E(0x1b,0x45,1);E(0x1d,0x21,0x11);L((DB.shop.name||'Shop').slice(0,W/2|0));E(0x1d,0x21,0);E(0x1b,0x45,0);
+  if(DB.shop.type)L(DB.shop.type);if(DB.shop.addr)L(DB.shop.addr);if(DB.shop.phone&&DB.print.phone)L('Ph: '+DB.shop.phone);if(DB.shop.gstin&&DB.print.gstin)L('GSTIN: '+DB.shop.gstin);
+  E(0x1b,0x61,0);sep();line((kind==='sale'?'Invoice ':kind==='quote'?'Quotation ':'Purchase ')+s.no,dlabel(s.date));L((kind==='purchase'?'From: ':'To: ')+s.partyName);sep();
+  s.items.forEach(i=>{L(i.name);line('  '+qf(i.qty)+' '+i.unit+' x '+i.rate+(i.disc?' (-'+i.disc+')':''),m(i.qty*i.rate-(i.disc||0)))});sep();
+  line('Subtotal',m(s.sub));if(s.gst)line('GST',m(s.gst));if(s.discount)line('Discount','-'+m(s.discount));if(s.extra)line('Extra charges',m(s.extra));
+  E(0x1b,0x45,1);E(0x1d,0x21,0x01);line('TOTAL',m(s.total));E(0x1d,0x21,0);E(0x1b,0x45,0);
+  if(kind!=='quote'){line('Paid ('+s.mode+')',m(s.paid));if(s.total-s.paid>0)line('Balance due',m(s.total-s.paid))}
+  if(DB.print.footer){sep();E(0x1b,0x61,1);L(DB.print.footer)}E(0x1b,0x64,4);E(0x1d,0x56,0x42,0);return o}
+const b64=a=>{let t='';for(let i=0;i<a.length;i+=8192)t+=String.fromCharCode.apply(null,a.slice(i,i+8192));return btoa(t)};
+async function btSend(bytes){if(!BTN()){toast('Bluetooth printing works in the installed app only');return false}
+  const pr=DB.printers.find(p=>p.def&&p.type==='bluetooth')||DB.printers.find(p=>p.type==='bluetooth');if(!pr){toast('Add a Bluetooth printer in Settings → Printer');return false}
+  try{let a=pr.addr||'';if(!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i.test(a)){const r=await BP().list();const d=(r.devices||[]).find(x=>(x.name||'').toLowerCase()===(a||pr.name).toLowerCase())||(r.devices||[]).find(x=>(x.name||'').toLowerCase().includes((a||pr.name).toLowerCase()));if(!d){toast('Printer not found. Pair it in phone Bluetooth first');return false}a=d.address}
+    toast('Printing…');await BP().print({address:a,data:b64(bytes)});toast('Sent to printer');return true}catch(e){toast(String((e&&e.message)||e).replace(/^.*?:\s*/,'').slice(0,80)||'Print failed');return false}}
+const btPrintDoc=(kind,s)=>btSend(escBytes(kind,s));
 const ptsOf=n=>r2((+n||0)*(DB.ptRate||2)/1000);
 function commit(kind,doc){
   (kind==='sale'?DB.sales:DB.purchases).push(doc);
@@ -663,6 +683,7 @@ V.invoice=p=>{const kind=p.kind,s=docsOf(kind).find(x=>x.id===p.id);if(!s)return
    <table class="num"><tr><td>Subtotal</td><td class="r">${money(s.sub)}</td></tr>${s.gst?`<tr><td>GST</td><td class="r">${money(s.gst)}</td></tr>`:''}${s.discount?`<tr><td>Discount</td><td class="r">-${money(s.discount)}</td></tr>`:''}${s.extra?`<tr><td>Extra charges</td><td class="r">${money(s.extra)}</td></tr>`:''}
    <tr><td><b>Total</b></td><td class="r"><b>${money(s.total)}</b></td></tr>${kind==='quote'?'':`<tr><td>Paid (${esc(s.mode)})</td><td class="r">${money(s.paid)}</td></tr>`}${due>0&&kind!=='quote'?`<tr><td>Balance due</td><td class="r c-warn">${money(due)}</td></tr>`:''}</table>${s.note?`<hr>Note: ${esc(s.note)}`:''}${DB.print.terms?`<hr><div class="small muted">${esc(DB.print.terms)}</div>`:''}${DB.print.footer?`<hr><div style="text-align:center">${esc(DB.print.footer)}</div>`:''}</div>
    <div class="g2"><button class="btn ghost" data-a="copybill" data-kind="${kind}" data-id="${s.id}">Copy bill text</button>${(DB.sms||{}).wa===false?'<span></span>':''}<a class="btn" style="${(DB.sms||{}).wa===false?'display:none;':''}text-decoration:none" href="https://wa.me/?text=${encodeURIComponent(waText(kind,s))}" target="_blank" rel="noopener">WhatsApp</a></div>
+ <button class="btn block" data-a="btprint" data-kind="${kind}" data-id="${s.id}">Print (Bluetooth thermal)</button>
  <button class="btn block" data-a="invpdf" data-kind="${kind}" data-id="${s.id}">A4 ${kind==='quote'?'Quotation':kind==='purchase'?'Purchase Bill':'Tax Invoice'} PDF (Print / Share)</button>
  ${kind==='sale'?`<button class="btn ghost block" data-a="go" data-to="retform" data-id="${s.id}">Return items</button>`:''}${kind==='purchase'?`<button class="btn ghost block" data-a="go" data-to="pretform" data-id="${s.id}">Return items</button>`:''}${kind==='quote'?`<button class="btn block" data-a="quote2sale" data-id="${s.id}">Convert to sale</button>`:''}
    <button class="btn danger block" data-a="deldoc" data-kind="${kind}" data-id="${s.id}" data-confirm>${kind==='quote'?'Delete quotation':'Delete bill and restore stock'}</button></div>`}};
@@ -1418,7 +1439,7 @@ V.printer=()=>{const q=DB.print,on=DB.printing===true;return{t:'Printer Settings
   <div class="stack" style="gap:14px">${Object.keys(PTYPE).map(k=>`<button class="pradd" style="background:${PTYPE[k][1]}" data-a="go" data-to="printerform" data-type="${k}">Add ${PTYPE[k][0]} Printer</button>`).join('')}</div>
   <div class="card stack"><h3>Receipt settings</h3><div class="field"><label for="pr-paper">Paper size</label><select class="in" id="pr-paper">${['58mm','80mm','A4'].map(x=>`<option${q.paper===x?' selected':''}>${x}</option>`).join('')}</select></div>${field('pr-foot','Footer message',q.footer)}
   <label class="row" style="gap:10px"><input type="checkbox" id="pr-gstin"${q.gstin?' checked':''}> Show GSTIN on bills</label><label class="row" style="gap:10px"><input type="checkbox" id="pr-phone"${q.phone?' checked':''}> Show shop phone on bills</label><button class="btn block" data-a="saveprint">Save settings</button></div>
-  <div class="banner">Direct printing to these printers is not part of this version yet. Your printers are saved here for later. Use “Copy bill text” or “WhatsApp” on any bill.</div></div>`}};
+  <div class="card stack"><h3>Bluetooth thermal printer</h3><p class="muted small" style="margin:0">1) Switch the printer ON and pair it in phone Settings → Bluetooth (PIN 0000 or 1234). 2) Tap “Find paired printers” and choose it. 3) Tap “Test print”.</p><button class="btn block" data-a="btscan">Find paired printers</button><button class="btn ghost block" data-a="bttest">Test print</button></div></div>`}};
 V.printerform=p=>{const k=PTYPE[p.type]?p.type:'bluetooth';return{t:'Add '+PTYPE[k][0]+' Printer',h:`<div class="card stack"><input type="hidden" id="pf-type" value="${k}">${field('pf-name','Printer name','')}${k==='network'?`<div class="g2">${field('pf-addr','IP address','','text','inputmode="decimal" placeholder="192.168.1.50"')}${field('pf-port','Port','9100','number')}</div>`:k==='bluetooth'?field('pf-addr','Device name or address (optional)','','text','placeholder="Pair it in Android Bluetooth first"'):field('pf-addr','Model (optional)','')}<button class="btn block" data-a="saveprinter">Save printer</button></div>`}};
 
 function ensure(d){d.preturns=d.preturns||[];d.damages=d.damages||[];d.printers=d.printers||[];d.depts=d.depts||[];d.desigs=d.desigs||[];d.holidays=d.holidays||[];d.leaves=d.leaves||[];d.drafts=d.drafts||[];d.returns=d.returns||[];d.quotes=d.quotes||[];d.staff=d.staff||[];d.attend=d.attend||{};d.spay=d.spay||[];d.loans=d.loans||[];d.assets=d.assets||[];d.invest=d.invest||[];d.prod=d.prod||[];d.slog=d.slog||[];d.xfers=d.xfers||[];d.btx=d.btx||[];d.warehouses=d.warehouses||[];d.acct=d.acct||{Cash:0,Bank:0,UPI:0};
@@ -1607,6 +1628,10 @@ const ACT={
   delasset(d){DB.assets=DB.assets.filter(x=>x.id!==d.id);save();toast('Asset deleted');back()},
   prtoggle(){DB.printing=DB.printing!==true;save();render()},
   prrefresh(){render();toast('Refreshed')},
+  async btscan(){if(!BTN())return toast('Works in the installed app only');try{const r=await BP().list(),a=r.devices||[];mdlg('Paired printers',a.length?a.map(d=>`<button type="button" class="item" style="text-align:left" data-a="btpick" data-addr="${esc(d.address)}" data-name="${esc(d.name||d.address)}"><div class="t"><b>${esc(d.name||'Unknown')}</b><small>${esc(d.address)}</small></div></button>`).join(''):'<p>No paired devices. Pair the printer in phone Bluetooth settings first.</p>','Refresh','btscan')}catch(e){toast(String((e&&e.message)||e).replace(/^.*?:\s*/,'').slice(0,80))}},
+  btpick(d){DB.printers=DB.printers.filter(p=>p.addr!==d.addr);DB.printers.forEach(p=>p.def=false);DB.printers.push({id:uid(),type:'bluetooth',name:d.name,addr:d.addr,def:true});save();const m=document.getElementById('mdlg');if(m)m.remove();toast('Printer selected: '+d.name);render()},
+  bttest(){const o=[0x1b,0x40,0x1b,0x61,1,0x1b,0x45,1];const t='Zharvi Bill\nPrinter test OK\n'+(DB.print.paper||'80mm')+'\n\n\n\n';for(const c of t)o.push(c.charCodeAt(0)===10?10:c.charCodeAt(0)&0x7f);o.push(0x1d,0x56,0x42,0);btSend(o)},
+  btprint(d){const x=docsOf(d.kind).find(a=>a.id===d.id);if(x)btPrintDoc(d.kind,x)},
   prdef(d){DB.printers.forEach(p=>p.def=p.id===d.id);save();render()},
   prdel(d){DB.printers=DB.printers.filter(p=>p.id!==d.id);if(DB.printers.length&&!DB.printers.some(p=>p.def))DB.printers[0].def=true;save();render()},
   saveprinter(){const n=$('#pf-name').value.trim();if(!n)return toast('Enter the printer name');const k=$('#pf-type').value;let a=($('#pf-addr')||{}).value||'';a=a.trim();if(k==='network'){if(!a)return toast('Enter the IP address');a+=':'+(num(($('#pf-port')||{}).value)||9100)}DB.printers.push({id:uid(),type:k,name:n,addr:a,def:!DB.printers.length});save();toast('Printer saved');back()},
@@ -1635,7 +1660,7 @@ const ACT={
     const modes=c.pays.length?[...new Set(c.pays.map(p=>p.mode))].join(' + '):(t.paid>0?'Cash':'Credit');
     const doc=makeDoc(c.kind,{date:c.date,partyId:c.partyId,no:c.no,dp:c.dp,da:c.da,extra:t.extra,note:c.note.trim(),mode:modes,paid:t.paid,payList:c.pays.length?c.pays.slice():(t.paid>0?[{mode:'Cash',amt:t.paid}]:[]),items:c.items});
     if(isS&&c.star&&c.partyId){const pp=partyOf(c.partyId);if(pp){doc.pts=ptsOf(doc.total);pp.pts=r2((pp.pts||0)+doc.pts);doc.ptsTotal=pp.pts}}
-    commit(c.kind,doc);CART=newCart(c.kind);toast('Saved '+doc.no);go('invoice',{kind:c.kind,id:doc.id,replace:true});if(isS)waAuto(doc)},
+    commit(c.kind,doc);CART=newCart(c.kind);toast('Saved '+doc.no);go('invoice',{kind:c.kind,id:doc.id,replace:true});if(DB.printing===true&&BTN()&&DB.printers.some(p=>p.type==='bluetooth'))btPrintDoc(c.kind,doc);if(isS)waAuto(doc)},
   copybill(d){const s=docsOf(d.kind).find(x=>x.id===d.id);const txt=billText(d.kind,s);
     const fb=()=>{const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');toast('Bill copied')}catch(e){toast('Select and copy manually')}t.remove()};
     try{navigator.clipboard.writeText(txt).then(()=>toast('Bill copied'),fb)}catch(e){fb()}},
