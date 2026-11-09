@@ -109,7 +109,7 @@ select.pick{border:1px solid var(--line);background:var(--surface);border-radius
 .cartrow:last-child{border-bottom:0}
 .qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .qty button{width:32px;height:32px;display:grid;place-items:center}
-.qty span{min-width:34px;text-align:center;font-weight:600}
+.qty span{min-width:34px;text-align:center;font-weight:600}.qty .cq{width:64px;min-width:0;border:0;outline:none;text-align:center;font:600 16px var(--f-body,inherit);background:transparent;color:var(--fg);padding:0 2px;-moz-appearance:textfield}.qty .cq::-webkit-outer-spin-button,.qty .cq::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .rate{width:84px;padding:6px 8px;text-align:right}
 .totals div{display:flex;justify-content:space-between;padding:3px 0}
 .totals .big{font:800 22px var(--f-display);padding-top:8px}
@@ -209,7 +209,7 @@ textarea.in{min-height:96px;font-family:ui-monospace,Menlo,monospace;font-size:1
 .dsc.o span,.dsc.v span{padding:0 10px;font:700 15px var(--f-display);color:#fff;align-items:center;justify-content:center;gap:0}
 .dsc.o .t-o{background:var(--warn)}.dsc.v .t-v{background:var(--accent);color:var(--accent-fg,#fff)}
 .dsc.o input,.dsc.v input{flex:1;width:100%;min-width:0;border:0;outline:none;background:var(--surface);color:var(--fg);padding:8px 8px;font-size:15px;text-align:right}
-.dsc.sm{max-width:104px}.dsc.sm span{padding:0 8px;font-size:14px}.dsc.sm input{padding:6px 6px;font-size:14px}
+.idisc .dsc{flex:0 0 auto;width:112px;max-width:none;min-height:36px}.dsc.sm{max-width:104px}.dsc.sm span{padding:0 8px;font-size:14px}.dsc.sm input{padding:6px 6px;font-size:14px}
 .stf{position:relative;display:flex;align-items:center;gap:16px;width:100%;box-sizing:border-box;padding:18px;border-radius:22px;border:0;text-align:left;font:inherit;color:inherit;box-shadow:var(--shadow);background:radial-gradient(circle at 100% 0,var(--accent-soft) 0 52px,transparent 53px),var(--surface)}.stf .t{display:flex;flex-direction:column;gap:6px;min-width:0}.stf .t b{font:700 20px var(--f-display)}.stf .t small{color:var(--muted);font-size:15px;overflow:hidden;text-overflow:ellipsis}.sav{width:56px;height:56px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font:600 22px var(--f-display);flex:none}.rp{font-style:normal;align-self:flex-start;background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:4px 12px;font-size:14px}
 .bchk{width:22px;height:22px;border-radius:6px;border:2px solid var(--accent);background:var(--surface);display:inline-grid;place-items:center;flex:none;color:#fff;padding:0}.bchk.on{background:var(--accent)}.bchk .i{stroke-width:3.4}.pc.bopt{display:inline-flex;align-items:center;gap:8px}
 .htile{background:var(--surface);border:0;border-radius:18px;box-shadow:var(--shadow);padding:22px 6px 18px;display:flex;flex-direction:column;align-items:center;gap:14px;position:relative;overflow:hidden;color:var(--fg);font:inherit;min-width:0}.htile:before{content:'';position:absolute;right:-18px;top:-18px;width:62px;height:62px;border-radius:50%;background:var(--cs);opacity:.7}.hic{position:relative;width:62px;height:62px;border-radius:50%;background:var(--cs);color:var(--c);display:grid;place-items:center}.htile b{position:relative;font:600 15.5px var(--f-display);text-align:center;line-height:1.15}.htile:active{transform:scale(.97)}
@@ -609,7 +609,7 @@ function entry(kind){
       <div class="idisc"><div class="dsc o sm"><span class="t-o">%</span><input id="idp-${n}" type="number" inputmode="decimal" value="${esc(dp)}" placeholder="0" data-i="idp" data-n="${n}" aria-label="Item discount percent"></div><div class="dsc v sm"><span class="t-v">₹</span><input id="ida-${n}" type="number" inputmode="decimal" value="${esc(da)}" placeholder="0" data-i="ida" data-n="${n}" aria-label="Item discount rupees"></div></div>
       <div class="iside"><button class="iconbtn" style="width:30px;height:30px;box-shadow:none;background:var(--bad-soft);color:var(--bad);border-radius:50%" data-a="rm" data-n="${n}" aria-label="Remove">${ico('x',15)}</button>${pr&&isS?`<span class="stk">Stock: ${qf(pr.stock)}</span>`:''}</div></div>
       <div class="row between" style="margin-top:10px">${i.er?`<input class="in sm num" style="width:120px" id="ir-${n}" type="number" inputmode="decimal" value="${i.rate}" data-i="rate" data-n="${n}" aria-label="Rate">`:`<button class="calc" data-a="editrate" data-n="${n}">${qf(i.qty)} x ${i.rate} = <b id="lt-${n}" style="color:var(--fg)">${money(i.qty*i.rate-lineDisc(i))}</b> ${ico('edit',13)}</button>`}
-       <div class="qty"><button data-a="qty" data-n="${n}" data-d="-1" aria-label="Less">${ico('minus',16)}</button><span class="num">${qf(i.qty)}</span><button data-a="qty" data-n="${n}" data-d="1" aria-label="More">${ico('plus',16)}</button></div></div></div>`}).join('');
+       <div class="qty"><button data-a="qty" data-n="${n}" data-d="-1" aria-label="Less">${ico('minus',16)}</button><input class="cq num" id="cq-${n}" type="number" inputmode="decimal" min="0" value="${qf(i.qty)}" data-i="cqty" data-n="${n}" aria-label="Quantity"><button data-a="qty" data-n="${n}" data-d="1" aria-label="More">${ico('plus',16)}</button></div></div></div>`}).join('');
   if(isQ){const pn=(DB.parties.find(p=>p.id===c.partyId)||{}).name||'Guest',has=c.items.length>0;
    return{t:'New Quotation',h:`<div class="stack" style="gap:14px">
    <div class="qhd">${ico('person',22)}<b>Choose a Customer</b></div>
@@ -1786,6 +1786,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!
   if(el.hasAttribute('data-confirm')&&!el.classList.contains('armed')){e.preventDefault();el.classList.add('armed');el.dataset.o=el.textContent;el.textContent='Tap again to confirm';setTimeout(()=>{if(el.isConnected){el.classList.remove('armed');el.textContent=el.dataset.o}},3000);return}
   const f=ACT[el.dataset.a];if(f)f(Object.assign({},el.dataset),el)});
 const INP={
+  cqty(el){const i=CART.items[+el.dataset.n];if(!i)return;const q=num(el.value);if(q>0){i.qty=q;updTotals()}},
   pqty(el){const p=DB.products.find(x=>x.id===el.dataset.id);if(!p)return;const q=num(el.value),i=CART.items.findIndex(x=>x.pid===p.id);if(q>0){if(i>=0)CART.items[i].qty=q;else CART.items.push(mkLine(p,q))}else if(i>=0)CART.items.splice(i,1);refreshItems()},
   rpq(el){UI.lq=el.value;const b=$('#rlist');if(b&&RL[cur.name])b.innerHTML=RL[cur.name]()},
   lpsel(el){UI.lp=el.value;UI.cal=false;if(el.value==='custom'){UI.cf=UI.cf||today();UI.ct=UI.ct||today();UI.cal=true}render()},
@@ -1815,6 +1816,7 @@ const INP={
 };
 function logoLoad(file,mx){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const m=mx||260,k=Math.min(1,m/Math.max(im.width,im.height)),w=Math.max(1,Math.round(im.width*k)),h=Math.max(1,Math.round(im.height*k)),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);res({d:c.toDataURL('image/jpeg',0.85),w,h})};im.onerror=()=>res(null);im.src=r.result};r.onerror=()=>res(null);r.readAsDataURL(file)})}
 const CHG={
+  cqty:el=>{const i=CART.items[+el.dataset.n];if(!i)return;const q=num(el.value);if(q>0){i.qty=q}else{el.value=qf(i.qty)}const y=window.scrollY;render();window.scrollTo(0,y)},
   ppphoto:async el=>{const f=el.files&&el.files[0];if(!f)return;const o=await logoLoad(f,160);if(!o)return toast('Could not read this image');UI.ppPh=o.d;const b=document.getElementById('pp-ph');if(b){b.innerHTML=`<img src="${o.d}" alt="">`;b.appendChild(el)}},
   selnew:el=>{const n=document.getElementById(el.dataset.t);if(n){n.style.display=el.value==='__new'?'':'none';if(el.value==='__new')n.focus()}},
   pfphoto:async el=>{const f=el.files&&el.files[0];if(!f)return;const o=await logoLoad(f,200);if(!o)return toast('Could not read this image');UI.pfPh=o.d;const b=document.getElementById('pf-ph');if(b){const im=b.querySelector('img')||document.createElement('img');im.src=o.d;if(!im.parentNode){b.innerHTML='';b.appendChild(im);b.appendChild(el)}}},
