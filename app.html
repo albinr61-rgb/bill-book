@@ -1786,7 +1786,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!
   if(el.hasAttribute('data-confirm')&&!el.classList.contains('armed')){e.preventDefault();el.classList.add('armed');el.dataset.o=el.textContent;el.textContent='Tap again to confirm';setTimeout(()=>{if(el.isConnected){el.classList.remove('armed');el.textContent=el.dataset.o}},3000);return}
   const f=ACT[el.dataset.a];if(f)f(Object.assign({},el.dataset),el)});
 const INP={
-  cqty(el){const i=CART.items[+el.dataset.n];if(!i)return;const q=num(el.value);if(q>0){i.qty=q;updTotals()}},
+  cqty(el){const i=CART.items[+el.dataset.n];if(!i)return;const q=num(el.value);if(q>0){i.qty=q;updTotals();if(i.pid){const pk=document.querySelector('.pq[data-id="'+i.pid+'"]');if(pk&&pk!==document.activeElement)pk.value=qf(q)}}},
   pqty(el){const p=DB.products.find(x=>x.id===el.dataset.id);if(!p)return;const q=num(el.value),i=CART.items.findIndex(x=>x.pid===p.id);if(q>0){if(i>=0)CART.items[i].qty=q;else CART.items.push(mkLine(p,q))}else if(i>=0)CART.items.splice(i,1);refreshItems()},
   rpq(el){UI.lq=el.value;const b=$('#rlist');if(b&&RL[cur.name])b.innerHTML=RL[cur.name]()},
   lpsel(el){UI.lp=el.value;UI.cal=false;if(el.value==='custom'){UI.cf=UI.cf||today();UI.ct=UI.ct||today();UI.cal=true}render()},
@@ -1816,7 +1816,7 @@ const INP={
 };
 function logoLoad(file,mx){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const m=mx||260,k=Math.min(1,m/Math.max(im.width,im.height)),w=Math.max(1,Math.round(im.width*k)),h=Math.max(1,Math.round(im.height*k)),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);res({d:c.toDataURL('image/jpeg',0.85),w,h})};im.onerror=()=>res(null);im.src=r.result};r.onerror=()=>res(null);r.readAsDataURL(file)})}
 const CHG={
-  cqty:el=>{const i=CART.items[+el.dataset.n];if(!i)return;const q=num(el.value);if(q>0){i.qty=q}else{el.value=qf(i.qty)}const y=window.scrollY;render();window.scrollTo(0,y)},
+  cqty:el=>{const i=CART.items[+el.dataset.n];if(!i)return;const q=num(el.value);if(q>0){i.qty=q}el.value=qf(i.qty);updTotals()},
   ppphoto:async el=>{const f=el.files&&el.files[0];if(!f)return;const o=await logoLoad(f,160);if(!o)return toast('Could not read this image');UI.ppPh=o.d;const b=document.getElementById('pp-ph');if(b){b.innerHTML=`<img src="${o.d}" alt="">`;b.appendChild(el)}},
   selnew:el=>{const n=document.getElementById(el.dataset.t);if(n){n.style.display=el.value==='__new'?'':'none';if(el.value==='__new')n.focus()}},
   pfphoto:async el=>{const f=el.files&&el.files[0];if(!f)return;const o=await logoLoad(f,200);if(!o)return toast('Could not read this image');UI.pfPh=o.d;const b=document.getElementById('pf-ph');if(b){const im=b.querySelector('img')||document.createElement('img');im.src=o.d;if(!im.parentNode){b.innerHTML='';b.appendChild(im);b.appendChild(el)}}},
